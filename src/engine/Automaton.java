@@ -2,12 +2,10 @@ package engine;
 
 import gui.World;
 
+import java.awt.*;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
-import java.awt.Color;
-import java.awt.Point;
-import java.awt.Rectangle;
 import java.awt.geom.Area;
 
 public class Automaton {
@@ -246,12 +244,38 @@ public class Automaton {
 		this.checkforResource();
 	}
 
-	public enum AutomotonState { 
-	    RETURNING_RESOURCES, 
-	    SWARMING_TO_RESOURCE,
-	    EXPLORATION_CHOOSE_DESTINATION,
-	    EXPLORATION_GOTO_DESTINATION,
-	    DEAD 
+	public enum AutomotonState {
+		RETURNING_RESOURCES {
+			@Override
+			public <T> T update(Automaton automaton) {
+				return null;
+			}
+		},
+		SWARMING_TO_RESOURCE {
+			@Override
+			public <T> T update(Automaton automaton) {
+				return null;
+			}
+		},
+		EXPLORATION_CHOOSE_DESTINATION {
+			@Override
+			public <T> T update(Automaton automaton) {
+				return null;
+			}
+		},
+		EXPLORATION_GOTO_DESTINATION {
+			@Override
+			public <T> T update(Automaton automaton) {
+				return null;
+			}
+		},
+		DEAD {
+			@Override
+			public <T> T update(Automaton automaton) {
+				return null;
+			}
+		};
+
+		public abstract <T> T update(Automaton automaton);
 	}
-	
 }
