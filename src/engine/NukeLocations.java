@@ -1,31 +1,37 @@
 package engine;
 
+import shared.Utils;
+
 import java.awt.Color;
-import java.awt.Point;
 import java.util.HashMap;
 import java.util.Set;
 
 
-public class NukeLocations {
+public enum NukeLocations {
 
-	private HashMap <Point, Integer >locationMap;
-	private static Color nukeColor;
+	INSTANCE;
 
-	public NukeLocations(){
-		nukeColor = Color.GRAY;
+	private final HashMap <CartesianPoint<Double>, Integer >locationMap;
+
+	NukeLocations() {
 		this.locationMap = new HashMap<>();
 	}
 
-	public synchronized void registerNuke(final int x, final int y){
-		final Point p = new Point (x, y);
+	public static NukeLocations getInstance() {
+		return INSTANCE;
+	}
+
+	public synchronized void registerNuke(final double x,
+										  final double y){
+		final CartesianPoint<Double> p = new CartesianPoint<> (x, y);
 		this.locationMap.put(p, 100);
 	}
 
 	public static Color getNukeColor() {
-		return nukeColor;
+		return Utils.nukeColor;
 	}
 	
-	public Set<Point> getNukeLocations() {
+	public Set<CartesianPoint<Double>> getNukeLocations() {
 		return this.locationMap.keySet();
 	}
 

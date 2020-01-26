@@ -1,281 +1,250 @@
 package engine;
 
-import gui.World;
+import shared.Utils;
 
 import java.awt.*;
 import java.util.Iterator;
-import java.util.Random;
 import java.util.Set;
 import java.awt.geom.Area;
 
 public class Automaton {
 
-	private double xPosition, deltaX;
-	private double yPosition, deltaY;
-	private double distanceToDestination;
-	private final int size;
-	private final ResourceLocations resourceList;
-	private final NukeLocations nukeList;
-	private Color color;
-	private final int id;
-	private Point resourceLocation;
-	private final World world;
-	private final Hive hive;
-	private int amountOfResourcesFound;
-	private int age;
-	private int energy;
-	private final Point pointOfInterest;
-	
-	private static final double AUTOMOTON_SPEED_NORMAL = .450;
-	private static final double AUTOMOTON_SPEED_WHEN_RETURNING_FOOD = .15;
-	private static final double NOTIFICATION_SENSETIVITY = 1;
-	private static final Random R = new Random();
-	private static final Color BROWN = new Color(139,69,19, 200);
+    private CartesianPoint<Double> position;
+    private CartesianPoint<Double> velocity;
+    private double distanceToDestination;
+    private final int size;
+    private CartesianPoint<Double> resourceLocation;
+    private final Hive hive;
+    private int amountOfResourcesFound;
+    private int age;
+    private int energy;
+    private CartesianPoint<Double> targetLocation;
+    private AutomotonState automotonState;
 
-	private AutomotonState automotonState;
+    Automaton(final Hive h,
+              final int size) {
+        this.hive = h;
+        this.position = new CartesianPoint<>(h.getBaseX(), h.getBaseY());
+        this.velocity = new CartesianPoint<>(0.0, 0.0);
+        this.size = size;
+        this.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
+        this.age = 0;
+        this.energy = Utils.DEFAULT_ENERGY;
+        this.targetLocation = new CartesianPoint<>(-1.0, -1.0);
+    }
 
-	Automaton(final Hive h,
-			  final int automoton_size,
-			  final World world,
-			  final ResourceLocations rl,
-			  final NukeLocations nl,
-			  final Color automaton_color,
-			  final int automoton_id) {
-		this.hive = h;
-		this.xPosition = h.getBaseX();
-		this.yPosition = h.getBaseY();
-		this.deltaX = 0;
-		this.deltaY = 0;
-		this.size = automoton_size;
-		this.resourceList = rl;
-		this.nukeList = nl;
-		this.color = automaton_color;
-		this.id = automoton_id;
-		this.world = world;
-		this.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
-		this.color = Color.RED;
-		this.age = 0;
-		this.energy = 30;
-		this.pointOfInterest = new Point();
-	}
+    private CartesianPoint<Double> getPosition() {
+        return this.position;
+    }
 
-	void move() {
-		
-		if (this.automotonState == AutomotonState.EXPLORATION_CHOOSE_DESTINATION) {
-			double destination_x, destination_y;
-			final int xBoundary = this.world.getWidth();
-			final int yBoundary = this.world.getHeight();
-			
-			double gx;
-			do {
-				gx = R.nextGaussian();
-				destination_x = this.xPosition + (gx * 40);
-			} while (destination_x > xBoundary || destination_x < 0 || gx > 1 || gx < -1);
-			
-			double gy;
-			do {
-				gy = R.nextGaussian();
-				destination_y = this.yPosition + (gy * 40);
-			} while (destination_y > yBoundary || destination_y < 0 || gy > 1 || gy < -1);
-			this.pointOfInterest.setLocation(destination_x, destination_y);
-			this.distanceToDestination = this.pointOfInterest.distance(this.xPosition, this.yPosition);
-			this.deltaX = (destination_x - this.xPosition) * AUTOMOTON_SPEED_NORMAL;
-			this.deltaY = (destination_y - this.yPosition) * AUTOMOTON_SPEED_NORMAL;
-			this.automotonState = AutomotonState.EXPLORATION_GOTO_DESTINATION;
-		} else if (this.automotonState == AutomotonState.EXPLORATION_GOTO_DESTINATION) {
-			this.xPosition += (this.deltaX / this.distanceToDestination);
-			this.yPosition += (this.deltaY / this.distanceToDestination);
-			if(this.pointOfInterest.distance(this.xPosition, this.yPosition) < 1){
-				this.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
-			}
-		}
-	}
+    public double getX(){
+        return this.position.getX();
+    }
 
-	void notifyOthersOnReturn(final Hive h){
-		for(final Automaton automaton : h.getAutomatons()){
-			final AutomotonState st = automaton.getState();
-			if((st == AutomotonState.EXPLORATION_GOTO_DESTINATION) && (automaton.getId() != this.id) &&
-					(Point.distance(this.xPosition, this.yPosition, automaton.getX(), automaton.getY()) < this.size + NOTIFICATION_SENSETIVITY)){
-				automaton.setResourceLocation(this.resourceLocation);
-				automaton.setDx((this.resourceLocation.getX() - automaton.getX()) * AUTOMOTON_SPEED_NORMAL);
-				automaton.setDy((this.resourceLocation.getY() - automaton.getY()) * AUTOMOTON_SPEED_NORMAL);
-				automaton.setD(this.resourceLocation.distance(automaton.getX(), automaton.getY()));
-				automaton.setState(AutomotonState.SWARMING_TO_RESOURCE);
-			}
-		}
-	}   
+    public double getY(){
+        return this.position.getY();
+    }
 
-	void checkforResource(){
-		
-		final Set<Point> s = this.resourceList.getResourceLocations();
-		final Iterator <Point> it = s.iterator();
-		final int resource_size = ResourceLocations.getResourceSize();
-		
-		while ( it.hasNext() ) {
-			final Point p = it.next();
-			if (p.distance(this.xPosition, this.yPosition) < resource_size) {
-				final Area resource_area = new Area(new Rectangle((int)p.getX(), (int)p.getY(), resource_size, resource_size ));
-				if (resource_area.contains(this.xPosition, this.yPosition)) {
-					this.deltaX = (this.hive.getBaseX() - this.xPosition) * AUTOMOTON_SPEED_WHEN_RETURNING_FOOD;
-					this.deltaY = (this.hive.getBaseY() - this.yPosition) * AUTOMOTON_SPEED_WHEN_RETURNING_FOOD;
-					final Point hive_location = this.hive.getHiveLocation();
-					this.distanceToDestination = hive_location.distance(this.xPosition, this.yPosition);
-					this.resourceLocation = new Point((int) this.xPosition, (int) this.yPosition);
-					this.amountOfResourcesFound = this.resourceList.removeResources((int)p.getX(), (int)p.getY(), this.hive.getPayLoadCapacity());
-					this.automotonState = AutomotonState.RETURNING_RESOURCES;
-					return;
-				}
-			}
-		}
-		this.resourceLocation = null;
-	}
-	
-	void checkforNuke() {
-		for (final Point p : this.nukeList.getNukeLocations()) {
-			if (p.distance(this.xPosition, this.yPosition) <= 10) {
-				this.energy--;
-				this.deltaX = this.deltaX * .96;
-				this.deltaY = this.deltaY * .96;
-				if (this.energy <= 0) {
-					this.automotonState = AutomotonState.DEAD;
-					this.color = BROWN;
-				}
-			}
-		}
-	}
+    public double getDeltaX() {
+        return this.velocity.getX();
+    }
 
-	int getAge() {
-		return this.age;
-	}
+    public double getDeltaY() {
+        return this.velocity.getY();
+    }
 
-	void swarmToResourceLocation(){
-		if(this.resourceLocation.distance(this.xPosition, this.yPosition) < 1){
-			this.xPosition = this.resourceLocation.getX();
-			this.yPosition = this.resourceLocation.getY();
-			this.color = Color.RED;
-			this.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
-			this.checkforResource();
-		} else {
-			this.xPosition += (this.deltaX / this.distanceToDestination);
-			this.yPosition += (this.deltaY / this.distanceToDestination);
-		}
-	}
+    int getAge() {
+        return this.age;
+    }
 
-	int returnMineralsToBase(){
-		this.xPosition += (this.deltaX / this.distanceToDestination);
-		this.yPosition += (this.deltaY / this.distanceToDestination);
-		final Point hive_location = this.hive.getHiveLocation();
-		if(hive_location.distance(this.xPosition, this.yPosition) <= this.size){
-			this.deltaX = (this.resourceLocation.getX() - this.xPosition) * AUTOMOTON_SPEED_NORMAL;
-			this.deltaY = (this.resourceLocation.getY() - this.yPosition) * AUTOMOTON_SPEED_NORMAL;
-			this.distanceToDestination = this.resourceLocation.distance(this.xPosition, this.yPosition);
-			this.automotonState = AutomotonState.SWARMING_TO_RESOURCE;
-			return this.amountOfResourcesFound;
-		}
-		return 0;
-	}
+    Hive getHive() {
+        return this.hive;
+    }
 
-	void incrementAge() {
-		this.age++;
-	}
+    private void notifyOthersOnReturn(){
+        for(final Automaton automaton : this.hive.getAutomatons()){
+            final AutomotonState st = automaton.getState();
+            if((st == AutomotonState.EXPLORATION_GOTO_DESTINATION) && (automaton != this) &&
+                    this.position.distance(automaton.getPosition()) < this.size + Utils.NOTIFICATION_SENSETIVITY){
+                automaton.setResourceLocation(this.resourceLocation);
+                automaton.updateVelocity((automaton.resourceLocation.getX() - automaton.getX()) * Utils.AUTOMOTON_SPEED_NORMAL,
+                                         (this.resourceLocation.getY() - automaton.getY()) * Utils.AUTOMOTON_SPEED_NORMAL);
+                automaton.setD(CartesianPoint.distance(this.resourceLocation, automaton.getPosition()));
+                automaton.setState(AutomotonState.SWARMING_TO_RESOURCE);
+            }
+        }
+    }
 
-	public int getSize() {
-		return this.size;
-	}
+    private void checkforResource(){
 
-	public double getX(){
-		return this.xPosition;
-	}
-	
-	public double getY(){
-		return this.yPosition;
-	}
+        final Set<CartesianPoint<Double>> s = ResourceLocations.getInstance().getResourceLocations();
+        final Iterator <CartesianPoint<Double>> it = s.iterator();
+        final int resourceSize = ResourceLocations.getResourceSize();
 
-	public double getDeltaX() {
-		return this.deltaX;
-	}
+        while (it.hasNext()) {
+            final CartesianPoint<Double> p = it.next();
+            if (p.distance(this.position) < resourceSize) {
+                final Area resource_area = new Area(new Rectangle(p.getX().intValue(), p.getY().intValue(), resourceSize, resourceSize ));
+                if (resource_area.contains(this.position.getX(), this.position.getY())) {
+                    this.updateVelocity((this.hive.getBaseX() - this.position.getX()) * Utils.AUTOMOTON_SPEED_WHEN_RETURNING_FOOD,
+                                        (this.hive.getBaseY() - this.position.getY()) * Utils.AUTOMOTON_SPEED_WHEN_RETURNING_FOOD);
+                    final CartesianPoint<Double> hive_location = this.hive.getHiveLocation();
+                    this.distanceToDestination = hive_location.distance(this.position);
+                    this.resourceLocation = new CartesianPoint<>(this.position);
+                    this.amountOfResourcesFound = ResourceLocations.getInstance().removeResources(p.getX().intValue(), p.getY().intValue(), this.hive.getPayLoadCapacity());
+                    this.automotonState = AutomotonState.RETURNING_RESOURCES;
+                    return;
+                }
+            }
+        }
+        this.resourceLocation = null;
+    }
 
-	public double getDeltaY() {
-		return this.deltaY;
-	}
+    private void checkforNuke() {
+        for (final CartesianPoint<Double> p : NukeLocations.getInstance().getNukeLocations()) {
+            if (p.distance(this.position) <= 10) {
+                this.energy--;
+                updateVelocity(this.velocity.getX() * Utils.VELOCITY_DAMPENING,
+                               this.velocity.getY() * Utils.VELOCITY_DAMPENING);
+                if (this.energy <= 0) {
+                    this.automotonState = AutomotonState.DEAD;
+                }
+            }
+        }
+    }
 
-	public Color getColor() {
-		return this.color;
-	}
+    private int returnMineralsToBase(){
 
-	private int getId() {
-		return this.id;
-	}
+        updatePosition(this.position.getX() + (this.velocity.getX() / this.distanceToDestination),
+                       this.velocity.getY() + (this.velocity.getY() / this.distanceToDestination));
+        final CartesianPoint<Double> hive_location = this.hive.getHiveLocation();
+        if(hive_location.distance(this.getPosition()) <= this.size){
+            updateVelocity((this.resourceLocation.getX() - this.position.getX()) * Utils.AUTOMOTON_SPEED_NORMAL,  (this.resourceLocation.getY() - this.position.getY()) * Utils.AUTOMOTON_SPEED_NORMAL);
+            this.distanceToDestination = CartesianPoint.distance(this.resourceLocation, this.getPosition());
+            this.automotonState = AutomotonState.SWARMING_TO_RESOURCE;
+            return this.amountOfResourcesFound;
+        }
+        return 0;
+    }
 
-	public AutomotonState getState() {
-		return this.automotonState;
-	}
+    public int getSize() {
+        return this.size;
+    }
 
-	public double getDistanceToDestination() {
-		return this.distanceToDestination;
-	}
-	
-	private void setDx(final double delta_x) {
-		this.deltaX = delta_x;
-	}
-	
-	private void setDy(final double delta_y) {
-		this.deltaY = delta_y;
-	}
-	
-	private void setD(final double d) {
-		this.distanceToDestination = d;
-	}
-	
-	void setState(final AutomotonState s) {
-		this.automotonState = s;
-	}
-	
-	private void setResourceLocation(final Point rl) {
-		this.resourceLocation = rl;
-	}
-	
-	void setColor(final Color c) {
-		this.color = c;
-	}
+    public AutomotonState getState() {
+        return this.automotonState;
+    }
 
-	public void iterate() {
-		this.move();
-		this.checkforResource();
-	}
+    public double getDistanceToDestination() {
+        return this.distanceToDestination;
+    }
 
-	public enum AutomotonState {
-		RETURNING_RESOURCES {
-			@Override
-			public <T> T update(Automaton automaton) {
-				return null;
-			}
-		},
-		SWARMING_TO_RESOURCE {
-			@Override
-			public <T> T update(Automaton automaton) {
-				return null;
-			}
-		},
-		EXPLORATION_CHOOSE_DESTINATION {
-			@Override
-			public <T> T update(Automaton automaton) {
-				return null;
-			}
-		},
-		EXPLORATION_GOTO_DESTINATION {
-			@Override
-			public <T> T update(Automaton automaton) {
-				return null;
-			}
-		},
-		DEAD {
-			@Override
-			public <T> T update(Automaton automaton) {
-				return null;
-			}
-		};
+    private CartesianPoint<Double> getTargetLocation() {
+        return this.targetLocation;
+    }
 
-		public abstract <T> T update(Automaton automaton);
-	}
+    private void updatePosition(final double xPosition,
+                                final double yPosition) {
+        this.position = new CartesianPoint<>(xPosition, yPosition);
+    }
+
+    private void updateVelocity(final double deltaX, final double deltaY) {
+        this.velocity = new CartesianPoint<>(deltaX, deltaY);
+    }
+
+    void incrementAge() {
+        this.age++;
+    }
+
+    private void setD(final double d) {
+        this.distanceToDestination = d;
+    }
+
+    void setState(final AutomotonState s) {
+        this.automotonState = s;
+    }
+
+    private void setResourceLocation(final CartesianPoint<Double> rl) {
+        this.resourceLocation = rl;
+    }
+
+    void iterate() {
+        this.automotonState.update(this);
+        this.checkforResource();
+        this.checkforNuke();
+    }
+
+    public enum AutomotonState {
+        RETURNING_RESOURCES {
+            @Override
+            public <T> T update(final Automaton automaton) {
+                automaton.hive.mineralCount += automaton.returnMineralsToBase();
+                automaton.notifyOthersOnReturn();
+                return null;
+            }
+        },
+        SWARMING_TO_RESOURCE {
+            @Override
+            public <T> T update(final Automaton automaton) {
+
+                if( CartesianPoint.distance(automaton.resourceLocation, automaton.getPosition()) < 1){
+                    automaton.updatePosition(automaton.resourceLocation.getX(), automaton.resourceLocation.getY());
+                    automaton.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
+                    automaton.checkforResource();
+                } else {
+                    automaton.updatePosition(automaton.position.getX() + (automaton.velocity.getX() / automaton.distanceToDestination),
+                                             automaton.position.getY() + (automaton.velocity.getY() / automaton.distanceToDestination));
+                }
+                return null;
+            }
+        },
+        EXPLORATION_CHOOSE_DESTINATION {
+            @Override
+            public <T> T update(final Automaton automaton) {
+                double destinationX, destinationY;
+                final int xBoundary = automaton.getHive().getWorld().getWidth();
+                final int yBoundary = automaton.getHive().getWorld().getHeight();
+
+                double gx;
+                do {
+                    gx = Utils.R.nextGaussian();
+                    destinationX = automaton.getX() + (gx * 40);
+                } while (destinationX > xBoundary || destinationX < 0 || gx > 1 || gx < -1);
+
+                double gy;
+                do {
+                    gy = Utils.R.nextGaussian();
+                    destinationY = automaton.getY() + (gy * 40);
+                } while (destinationY > yBoundary || destinationY < 0 || gy > 1 || gy < -1);
+                automaton.targetLocation = new CartesianPoint<>(destinationX, destinationY);
+                automaton.setD( CartesianPoint.distance(automaton.getTargetLocation(), automaton.getPosition()));
+                automaton.updateVelocity((destinationX - automaton.getX()) * Utils.AUTOMOTON_SPEED_NORMAL,
+                                         (destinationY - automaton.getY()) * Utils.AUTOMOTON_SPEED_NORMAL);
+                automaton.setState(AutomotonState.EXPLORATION_GOTO_DESTINATION);
+                automaton.checkforResource();
+                return null;
+            }
+        },
+        EXPLORATION_GOTO_DESTINATION {
+            @Override
+            public <T> T update(final Automaton automaton) {
+                automaton.updatePosition(automaton.position.getX() + (automaton.getDeltaX() / automaton.getDistanceToDestination()),
+                                         automaton.position.getY() + (automaton.getDeltaY() / automaton.getDistanceToDestination()));
+
+                if(CartesianPoint.distance(automaton.getTargetLocation(), automaton.getPosition()) < 1){
+                    automaton.setState(AutomotonState.EXPLORATION_CHOOSE_DESTINATION);
+                }
+                automaton.checkforResource();
+                return null;
+            }
+        },
+        DEAD {
+            @Override
+            public <T> T update(final Automaton automaton) {
+                return null;
+            }
+        };
+
+        protected abstract <T> T update(Automaton automaton);
+    }
 }

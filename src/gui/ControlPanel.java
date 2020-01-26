@@ -16,7 +16,7 @@ public class ControlPanel extends JPanel implements ActionListener  {
 	private static final int WIDTH = 150;
 	private static final int HEIGHT = 400;
 
-	private World theWorld;
+	private final World theWorld;
 	
 	public ControlPanel(final World w) {
 		super();

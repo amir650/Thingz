@@ -1,9 +1,6 @@
 package gui;
 
-import engine.Automaton;
-import engine.Hive;
-import engine.NukeLocations;
-import engine.ResourceLocations;
+import engine.*;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -21,25 +18,21 @@ import javax.swing.Timer;
 
 public class World extends JPanel implements MouseListener, MouseMotionListener {
 
-	private Collection<Hive> hives;
-	private ResourceLocations resourceLocations;
-	private NukeLocations nukeLocations;
-	private Timer worldTimer;
+	private final Collection<Hive> hives;
+	private final Timer worldTimer;
 	private int currentGeneration;
 	private MouseClickStates mouseStates;
+
 	private static final int WIDTH = 600;
 	private static final int HEIGHT = 400;
-
+	private static final int MAX_HIVE_SIZE = 1;
 	private static final BasicStroke wideStroke = new BasicStroke(1.5f);
 	private static final BasicStroke stroke = new BasicStroke(1.5f);
 
 	public World() {
-
 		this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
-		this.resourceLocations = new ResourceLocations();
-		this.nukeLocations = new NukeLocations();
-		this.hives = this.initHives();
-		this.worldTimer = new Timer(15, (ActionEvent e) -> {
+		this.hives = initHives();
+		this.worldTimer = new Timer(2, (ActionEvent e) -> {
 			for(final Hive hive : this.hives) {
 				hive.iterate();
 			}
@@ -54,7 +47,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 
 	private Collection<Hive> initHives() {
 		final List<Hive> hives = new ArrayList<>();
-		hives.add(new Hive(0, 200, this, this.resourceLocations, this.nukeLocations));
+		hives.add(new Hive(0, MAX_HIVE_SIZE, this));
 		return Collections.unmodifiableCollection(hives);
 	}
 
@@ -76,28 +69,28 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 		//draw the hive
 		for(final Hive hive : this.hives) {
 			g2d.setColor(hive.getColor());
-			final Polygon hive_location = hive.getHivePolygon();
+			final Polygon hive_location = createHivePolygon(hive);
 			g2d.fillPolygon(hive_location);
 
 		}
 		//draw nukes
 		g2d.setColor(NukeLocations.getNukeColor());
-		Point tmpPt;
-		Set <Point> s = this.nukeLocations.getNukeLocations();
-		Iterator<Point> it = s.iterator();
+		CartesianPoint<Double> tmpPt;
+		Set <CartesianPoint<Double>> s = NukeLocations.getInstance().getNukeLocations();
+		Iterator<CartesianPoint<Double>> it = s.iterator();
 		
 		while ( it.hasNext() ) { 
 			tmpPt = it.next();
-			drawCircle(	(int)tmpPt.getX(), (int)tmpPt.getY(), 10, g);
+			drawCircle(	tmpPt.getX().intValue(), tmpPt.getY().intValue(), 10, g);
 		}
         //draw the resources
 		g2d.setColor(ResourceLocations.getResourceColor());
-		s = this.resourceLocations.getResourceLocations();
+		s = ResourceLocations.getInstance().getResourceLocations();
 		it = s.iterator();
 		while ( it.hasNext() ) { 
 			tmpPt = it.next();
-			g2d.fill3DRect(	(int)tmpPt.getX(), 
-							(int)tmpPt.getY(), 
+			g2d.fill3DRect(	tmpPt.getX().intValue(),
+							tmpPt.getY().intValue(),
 							ResourceLocations.getResourceSize(), 
 							ResourceLocations.getResourceSize(),
 							false);
@@ -105,8 +98,21 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 		this.drawAutomotons(g2d);
 		g2d.setComposite(makeComposite(1.0f));
 		g2d.setColor(Color.ORANGE);
-		g2d.drawString( "minerals available: " + this.resourceLocations.getSize(), 330, 30);
+		g2d.drawString( "minerals available: " + ResourceLocations.getInstance().getResourceLocations().size(), 330, 30);
 		g2d.drawString( "current generation: " + this.currentGeneration, 330, 40);
+	}
+
+	private static Polygon createHivePolygon(Hive hive) {
+		final Polygon hivePolygon = new Polygon();
+		//pentagon
+		hivePolygon.addPoint((int) hive.getHiveLocation().getX().intValue(), (int) hive.getHiveLocation().getY().intValue());
+		hivePolygon.addPoint( hive.getHiveLocation().getX().intValue() + 6, (int) hive.getHiveLocation().getY().intValue() + 5);
+		hivePolygon.addPoint( hive.getHiveLocation().getX().intValue() + 12, (int) hive.getHiveLocation().getY().intValue() + 5);
+		hivePolygon.addPoint( hive.getHiveLocation().getX().intValue() + 18, (int) hive.getHiveLocation().getY().intValue());
+		hivePolygon.addPoint((int) hive.getHiveLocation().getX().intValue() + 10, (int) hive.getHiveLocation().getY().intValue() - 5);
+		hivePolygon.translate(-10, 0);
+
+		return hivePolygon;
 	}
 
 	private void drawAutomotons(final Graphics2D g2d) {
@@ -121,7 +127,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 							   final Graphics2D g2d) {
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		if (automaton.getState() == Automaton.AutomotonState.RETURNING_RESOURCES) {
-			g2d.setPaint(automaton.getColor());
+			g2d.setPaint(calculateAutomatonColor(automaton));
 			g2d.setStroke(wideStroke);
 			g2d.draw(new Ellipse2D.Double(automaton.getX(), automaton.getY(), automaton.getSize(), automaton.getSize()));
 			g2d.setStroke(stroke);
@@ -130,17 +136,21 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 		} else if (automaton.getState() == Automaton.AutomotonState.DEAD)  {
 			final Composite originalComposite = g2d.getComposite();
 			g2d.setComposite(makeComposite(.50f));
-			g2d.setPaint(automaton.getColor());
+			g2d.setPaint(calculateAutomatonColor(automaton));
 			g2d.setStroke(stroke);
 			g2d.fill3DRect((int) automaton.getX(), (int) automaton.getY(), automaton.getSize() - 1, automaton.getSize() - 1, true );
 			g2d.setComposite(originalComposite);
 		} else {
-			g2d.setPaint(automaton.getColor());
+			g2d.setPaint(calculateAutomatonColor(automaton));
 			g2d.setStroke(stroke);
 			g2d.draw(new Ellipse2D.Double(automaton.getX(), automaton.getY(), automaton.getSize(), automaton.getSize()));
 			this.paintArrow(automaton, g2d);
 		}
 
+	}
+
+	private Color calculateAutomatonColor(Automaton automaton) {
+		return automaton.getState() == Automaton.AutomotonState.DEAD ? Color.pink : Color.RED;
 	}
 
 	private void paintArrow(final Automaton automaton,
@@ -184,7 +194,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 //			}
 
 			if( ((evt.getX() > 0) && (evt.getX() < this.getWidth())) && ((evt.getY() > 0) && (evt.getY() < this.getHeight())))
-				this.resourceLocations.registerResource(evt.getX(), evt.getY());
+				ResourceLocations.getInstance().registerResource(evt.getX(), evt.getY());
 			this.repaint();
 		} else if (this.mouseStates == MouseClickStates.NUKE) {
 			
@@ -196,7 +206,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 //			}
 
 			if( ((evt.getX() > 0) && (evt.getX() < this.getWidth())) && ((evt.getY() > 0) && (evt.getY() < this.getHeight())))
-				this.nukeLocations.registerNuke(evt.getX(), evt.getY());
+				NukeLocations.getInstance().registerNuke(evt.getX(), evt.getY());
 			this.repaint();
 
 		}
@@ -273,7 +283,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
 //			}
 
 			if( ((evt.getX() > 0) && (evt.getX() < this.getWidth())) && ((evt.getY() > 0) && (evt.getY() < this.getHeight())))
-				this.nukeLocations.registerNuke(evt.getX(), evt.getY());
+				NukeLocations.getInstance().registerNuke(evt.getX(), evt.getY());
 			this.repaint();
 
 	}

@@ -7,8 +7,8 @@ import javax.swing.*;
 
 class Director extends JFrame {
 
-    private World simWorld;
-    private ControlPanel gamePanel;
+    private final World simWorld;
+    private final ControlPanel gamePanel;
 
     private Director() {
         super("Director");

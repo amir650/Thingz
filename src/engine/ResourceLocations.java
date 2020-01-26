@@ -1,40 +1,41 @@
 package engine;
 
-import java.util.Collection;
+import shared.Utils;
+
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Set;
 import java.awt.Color;
-import java.awt.Point;
 
-public class ResourceLocations {
+public enum ResourceLocations {
 
-	private HashMap <Point, Integer >locationMap;
-	private static Color  resourceColor;
-	private static int resourceSize = 7;
-	private static final int numResourcesToDrop = 1000;
+	INSTANCE;
 
-	public ResourceLocations(){
-		resourceColor = Color.CYAN;
+	private final HashMap<CartesianPoint<Double>, Integer> locationMap;
+
+	ResourceLocations() {
 		this.locationMap = new HashMap<>();
 	}
 
-	public synchronized void registerResource(final int x, final int y){
-		final Point p = new Point (x, y);
+	public static ResourceLocations getInstance() {
+		return INSTANCE;
+	}
+
+	public synchronized void registerResource(final double x,
+											  final double y){
+		final CartesianPoint<Double> p = new CartesianPoint<>(x, y);
 		Integer r = this.locationMap.get(p);
-		if ( r != null ) {
-			r += numResourcesToDrop;
+		if (r != null) {
+			r += Utils.numResourcesToDrop;
 		} else {
-			r = numResourcesToDrop;
+			r = Utils.numResourcesToDrop;
 		}
 		this.locationMap.put(p, r);
 	}
 
-	int removeResources(final int x,
-						final int y,
+	int removeResources(final double x,
+						final double y,
 						int pay_load_size){
-
-		final Point p = new Point (x, y);
+		final CartesianPoint<Double> p = new CartesianPoint<>(x, y);
 		Integer r = this.locationMap.get(p);
 		
 		if ( pay_load_size > r)
@@ -51,30 +52,20 @@ public class ResourceLocations {
 	}
 
 	public static int getResourceSize() {
-		return resourceSize;
+		return Utils.resourceSize;
 	}
 
-	public int getSize() {
-		final Collection<Integer> c = this.locationMap.values();
-		final Iterator<Integer> itr = c.iterator();
-		Integer r = 0;
-		while(itr.hasNext()) {
-			r+= itr.next();
-		}
-		return r;
-	}
-	
 	public static Color getResourceColor() {
-		return resourceColor;
+		return Utils.resourceColor;
 	}
 	
-	public Set <Point> getResourceLocations() {
+	public Set<CartesianPoint<Double>> getResourceLocations() {
 		return this.locationMap.keySet();
 	}
 
-	public boolean resourceExistsAtLocation(final int x, final int y){
-		final Point p = new Point (x, y);
-		return this.locationMap.containsKey(p);
-	}
+//	public boolean resourceExistsAtLocation(final int x, final int y){
+//		final Point p = new Point (x, y);
+//		return this.locationMap.containsKey(p);
+//	}
 
 }
