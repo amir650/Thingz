@@ -6,7 +6,6 @@ import java.awt.Color;
 import java.util.HashMap;
 import java.util.Set;
 
-
 public enum NukeLocations {
 
 	INSTANCE;

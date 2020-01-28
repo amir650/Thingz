@@ -3,6 +3,7 @@ package engine;
 import shared.Utils;
 
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.Set;
 import java.awt.Color;
 
@@ -23,6 +24,16 @@ public enum ResourceLocations {
 	public synchronized void registerResource(final double x,
 											  final double y){
 		final CartesianPoint<Double> p = new CartesianPoint<>(x, y);
+		Integer r = this.locationMap.get(p);
+		if (r != null) {
+			r += Utils.numResourcesToDrop;
+		} else {
+			r = Utils.numResourcesToDrop;
+		}
+		this.locationMap.put(p, r);
+	}
+
+	public synchronized void registerResource(CartesianPoint<Double> p){
 		Integer r = this.locationMap.get(p);
 		if (r != null) {
 			r += Utils.numResourcesToDrop;
@@ -61,6 +72,20 @@ public enum ResourceLocations {
 	
 	public Set<CartesianPoint<Double>> getResourceLocations() {
 		return this.locationMap.keySet();
+	}
+
+	public Optional<CartesianPoint<Double>> findResource(final Automaton automaton) {
+		CartesianPoint<Double> candidatePoint = null;
+		for(final CartesianPoint<Double> resourceLocation : this.locationMap.keySet()) {
+			if(CartesianPoint.distance(resourceLocation, automaton.getPosition()) < Utils.resourceSize) {
+				candidatePoint = resourceLocation;
+				break;
+			}
+		}
+		if(candidatePoint != null) {
+			this.locationMap.remove(candidatePoint);
+		}
+		return Optional.ofNullable(candidatePoint);
 	}
 
 //	public boolean resourceExistsAtLocation(final int x, final int y){
