@@ -33,7 +33,7 @@ public enum ResourceLocations {
 		this.locationMap.put(p, r);
 	}
 
-	public synchronized void registerResource(CartesianPoint<Double> p){
+	public synchronized void registerResource(final CartesianPoint<Double> p){
 		Integer r = this.locationMap.get(p);
 		if (r != null) {
 			r += Utils.numResourcesToDrop;

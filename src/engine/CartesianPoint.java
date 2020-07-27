@@ -8,12 +8,12 @@ public class CartesianPoint<T extends Number> {
     private final T y;
 
     public CartesianPoint(final T x,
-                   final T y) {
+                          final T y) {
         this.x = x;
         this.y = y;
     }
 
-    public CartesianPoint(final CartesianPoint<T> point) {
+    CartesianPoint(final CartesianPoint<T> point) {
         this.x = point.getX();
         this.y = point.getY();
     }
@@ -26,8 +26,8 @@ public class CartesianPoint<T extends Number> {
         return this.y;
     }
 
-    public static double distance(final CartesianPoint<Double> p1,
-                                  final CartesianPoint<Double> p2) {
+    static double distance(final CartesianPoint<Double> p1,
+                           final CartesianPoint<Double> p2) {
         final double xTerm = p2.getX() - p1.getX();
         final double yTerm = p2.getY() - p1.getY();
         return Math.sqrt((xTerm * xTerm) + (yTerm * yTerm));

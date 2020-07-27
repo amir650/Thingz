@@ -32,10 +32,10 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
                 hive.iterate();
             }
             this.currentGeneration++;
-            this.repaint();
+            repaint();
         });
-        this.addMouseListener(this);
-        this.addMouseMotionListener(this);
+        addMouseListener(this);
+        addMouseMotionListener(this);
         this.currentGeneration = 0;
         this.mouseStates = MouseClickStates.DROP_RESOURCES;
     }
@@ -66,7 +66,6 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
             g2d.setColor(hive.getColor());
             final Polygon hive_location = createHivePolygon(hive);
             g2d.fillPolygon(hive_location);
-
         }
         //draw nukes
         g2d.setColor(NukeLocations.getNukeColor());
@@ -113,7 +112,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
     private void drawAutomatons(final Graphics2D g2d) {
         for (final Hive hive : this.hives) {
             for (final Automaton automaton : hive.getAutomatons()) {
-                this.drawAutomaton(automaton, g2d);
+                drawAutomaton(automaton, g2d);
             }
         }
     }
@@ -121,7 +120,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
     private void drawAutomaton(final Automaton automaton,
                                final Graphics2D g2d) {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        if (automaton.getState() == Automaton.AutomotonState.RETURNING_RESOURCES) {
+        if (automaton.getState() == Automaton.AutomotonState.RETURN_RESOURCES) {
             g2d.setPaint(calculateAutomatonColor(automaton));
             g2d.setStroke(Utils.wideStroke);
             g2d.draw(new Ellipse2D.Double(automaton.getX(), automaton.getY(), automaton.getSize(), automaton.getSize()));
@@ -161,7 +160,10 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
         return AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha);
     }
 
-    private static void drawCircle(final int x, final int y, final int radius, final Graphics g) {
+    private static void drawCircle(final int x,
+                                   final int y,
+                                   final int radius,
+                                   final Graphics g) {
         g.drawOval(x - radius, y - radius, radius * 2, radius * 2);
     }
 
@@ -176,34 +178,26 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
     @Override
     public void mouseDragged(final MouseEvent evt) {
 
-        final int x = evt.getX();
-        final int y = evt.getY();
-
         if (this.mouseStates == MouseClickStates.DROP_RESOURCES) {
-
 //			final Polygon p = this.HiveCluster_A.getHivePolygon();
 //
 //			if (p.contains(x, y) ) {
 //				System.out.println("user clicks on the hive!");
 //				return;
 //			}
-
             if (((evt.getX() > 0) && (evt.getX() < this.getWidth())) && ((evt.getY() > 0) && (evt.getY() < this.getHeight())))
                 ResourceLocations.getInstance().registerResource(evt.getX(), evt.getY());
             this.repaint();
         } else if (this.mouseStates == MouseClickStates.NUKE) {
-
 //			final Polygon p = this.HiveCluster_A.getHivePolygon();
 //
 //			if ( p.contains(x, y) ) {
 //				System.out.println("user clicks on the hive!");
 //				return;
 //			}
-
             if (((evt.getX() > 0) && (evt.getX() < this.getWidth())) && ((evt.getY() > 0) && (evt.getY() < this.getHeight())))
                 NukeLocations.getInstance().registerNuke(evt.getX(), evt.getY());
             this.repaint();
-
         }
         //System.out.println("Mouse dragged!  x = " +evt.getX()+ " y = " +evt.getY());
     }
@@ -224,7 +218,7 @@ public class World extends JPanel implements MouseListener, MouseMotionListener 
         if (this.mouseStates == MouseClickStates.DROP_RESOURCES) {
             if (((x > 0) && (x < this.getWidth())) &&
                     ((y > 0) && (y < this.getHeight()))) {
-                CartesianPoint<Double> p = new CartesianPoint<>(x, y);
+                final CartesianPoint<Double> p = new CartesianPoint<>(x, y);
                 ResourceLocations.getInstance().registerResource(p);
                 System.out.println("Dropped resource at " +p);
             }

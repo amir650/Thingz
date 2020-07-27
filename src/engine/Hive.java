@@ -6,6 +6,7 @@ import shared.Utils;
 import java.util.ArrayList;
 import java.awt.Color;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Hive {
 
@@ -15,7 +16,7 @@ public class Hive {
 	private final int hiveMaxSize;
 	private final Color hiveColor;
 	private final World world;
-	int mineralCount;
+	private final AtomicLong minerals;
 
 	public Hive(final int initialSize,
 				final int maxSize,
@@ -23,9 +24,9 @@ public class Hive {
 		this.hiveMaxSize = maxSize;
 		this.hiveColor = Color.yellow;
 		this.world = world;
-		this.hiveLocation = new CartesianPoint<>((double)Utils.WIDTH / 2, (double)Utils.HEIGHT / 2);
+		this.hiveLocation = new CartesianPoint<>((double)Utils.WIDTH/2, (double)Utils.HEIGHT/2);
 		this.automatons = createAutomatons(initialSize);
-		this.mineralCount = 0;
+		this.minerals = new AtomicLong(0);
 	}
 
 	private List<Automaton> createAutomatons(final int initialSize) {
@@ -63,7 +64,18 @@ public class Hive {
 	public void iterate() {
 		spawn();
 		updateAutomatons();
+		nukes();
 		age();
+	}
+
+	private void nukes() {
+		for (final CartesianPoint<Double> p : NukeLocations.getInstance().getNukeLocations()) {
+			for(final Automaton automaton : this.automatons) {
+				if (CartesianPoint.distance(p, automaton.getPosition()) <= 10) {
+					automaton.poison();
+				}
+			}
+		}
 	}
 
 	private void spawn() {
@@ -73,12 +85,16 @@ public class Hive {
 	}
 
 	private void updateAutomatons() {
-		this.automatons.forEach(Automaton::iterate);
+		this.automatons.forEach(Automaton::update);
 	}
 
 	private void age() {
 		this.automatons.forEach(Automaton::incrementAge);
-		this.automatons.removeIf(automaton -> automaton.getAge() > Utils.AUTOMATON_REMOVE_CORPSE_AGE);
+		this.automatons.removeIf(automaton -> automaton.getAge().longValue() > Utils.AUTOMATON_REMOVE_CORPSE_AGE);
+	}
+
+	void depositMinerals(final long minerals) {
+		this.minerals.addAndGet(minerals);
 	}
 
 }

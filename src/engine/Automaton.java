@@ -3,6 +3,7 @@ package engine;
 import shared.Utils;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Automaton {
 
@@ -12,8 +13,8 @@ public class Automaton {
     private final int size;
     private CartesianPoint<Double> resourceLocation;
     private final Hive hive;
-    private int age;
-    private int energy;
+    private final AtomicLong age;
+    private final AtomicLong energy;
     private CartesianPoint<Double> targetLocation;
     private AutomotonState automotonState;
 
@@ -23,9 +24,9 @@ public class Automaton {
         this.position = new CartesianPoint<>(h.getBaseX(), h.getBaseY());
         this.velocity = new CartesianPoint<>(0.0, 0.0);
         this.size = size;
-        this.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
-        this.age = 0;
-        this.energy = Utils.DEFAULT_ENERGY;
+        this.automotonState = AutomotonState.CHOOSE_DESTINATION;
+        this.age = new AtomicLong(0);
+        this.energy = new AtomicLong(Utils.DEFAULT_ENERGY);
         this.targetLocation = new CartesianPoint<>(-1.0, -1.0);
     }
 
@@ -49,7 +50,7 @@ public class Automaton {
         return this.velocity.getY();
     }
 
-    int getAge() {
+    AtomicLong getAge() {
         return this.age;
     }
 
@@ -60,8 +61,8 @@ public class Automaton {
     private void notifyOthersOnReturn(){
         for(final Automaton automaton : this.hive.getAutomatons()){
             final AutomotonState st = automaton.getState();
-            if((st == AutomotonState.EXPLORATION_GOTO_DESTINATION) && (automaton != this) &&
-                    (CartesianPoint.distance(this.position, automaton.getPosition()) < (this.size + Utils.NOTIFICATION_SENSITIVITY))){
+            if((st == AutomotonState.GOTO_DESTINATION) && (automaton != this) &&
+                    CartesianPoint.distance(this.position, automaton.getPosition()) < this.size + Utils.NOTIFICATION_SENSITIVITY){
                 automaton.setResourceLocation(this.resourceLocation);
                 automaton.updateVelocity((automaton.resourceLocation.getX() - automaton.getX()) * Utils.AUTOMATON_SPEED_NORMAL,
                                          (this.resourceLocation.getY() - automaton.getY()) * Utils.AUTOMATON_SPEED_NORMAL);
@@ -80,23 +81,10 @@ public class Automaton {
             this.distanceToDestination = CartesianPoint.distance(hive_location, this.position);
             this.resourceLocation = new CartesianPoint<>(this.position);
             //this.amountOfResourcesFound = ResourceLocations.getInstance().removeResources(p.getX().intValue(), p.getY().intValue(), this.hive.getPayLoadCapacity());
-            this.automotonState = AutomotonState.RETURNING_RESOURCES;
+            this.automotonState = AutomotonState.RETURN_RESOURCES;
             return;
         }
         this.resourceLocation = null;
-    }
-
-    private void checkforNuke() {
-        for (final CartesianPoint<Double> p : NukeLocations.getInstance().getNukeLocations()) {
-            if (CartesianPoint.distance(p, this.position) <= 10) {
-                this.energy--;
-                updateVelocity(this.velocity.getX() * Utils.VELOCITY_DAMPENING,
-                               this.velocity.getY() * Utils.VELOCITY_DAMPENING);
-                if (this.energy <= 0) {
-                    this.automotonState = AutomotonState.DEAD;
-                }
-            }
-        }
     }
 
     private int returnMineralsToBase() {
@@ -138,10 +126,14 @@ public class Automaton {
     }
 
     void incrementAge() {
-        this.age++;
-        if(this.age > Utils.AUTOMATON_AGE_LIMIT) {
+        this.age.incrementAndGet();
+        if(this.age.longValue() > Utils.AUTOMATON_AGE_LIMIT) {
             this.automotonState = AutomotonState.DEAD;
         }
+    }
+
+    private void setTargetLocation(final CartesianPoint<Double> targetLocation) {
+        this.targetLocation = targetLocation;
     }
 
     private void setDistanceToLocation(final double d) {
@@ -156,17 +148,25 @@ public class Automaton {
         this.resourceLocation = rl;
     }
 
-    void iterate() {
+    void update() {
         this.automotonState.update(this);
-        //this.checkforResource();
-        this.checkforNuke();
+    }
+
+    void poison() {
+        if (this.energy.longValue() <= 0) {
+            this.automotonState = Automaton.AutomotonState.DEAD;
+        } else {
+            this.energy.decrementAndGet();
+            updateVelocity(this.velocity.getX() * Utils.VELOCITY_DAMPENING,
+                    this.velocity.getY() * Utils.VELOCITY_DAMPENING);
+        }
     }
 
     public enum AutomotonState {
-        RETURNING_RESOURCES {
+        RETURN_RESOURCES {
             @Override
             public void update(final Automaton automaton) {
-                automaton.hive.mineralCount += automaton.returnMineralsToBase();
+                automaton.getHive().depositMinerals(automaton.returnMineralsToBase());
                 automaton.notifyOthersOnReturn();
             }
         },
@@ -175,7 +175,7 @@ public class Automaton {
             public void update(final Automaton automaton) {
                 if( CartesianPoint.distance(automaton.resourceLocation, automaton.getPosition()) < 1){
                     automaton.updatePosition(automaton.resourceLocation.getX(), automaton.resourceLocation.getY());
-                    automaton.automotonState = AutomotonState.EXPLORATION_CHOOSE_DESTINATION;
+                    automaton.automotonState = AutomotonState.CHOOSE_DESTINATION;
                     automaton.checkforResource();
                 } else {
                     automaton.updatePosition(automaton.position.getX() + (automaton.velocity.getX() / automaton.distanceToDestination),
@@ -183,41 +183,39 @@ public class Automaton {
                 }
             }
         },
-        EXPLORATION_CHOOSE_DESTINATION {
+        CHOOSE_DESTINATION {
             @Override
             public void update(final Automaton automaton) {
                 double destinationX, destinationY;
                 final int xBoundary = automaton.getHive().getWorld().getWidth();
                 final int yBoundary = automaton.getHive().getWorld().getHeight();
-
                 double gx;
                 do {
                     gx = Utils.R.nextGaussian();
-                    destinationX = automaton.getX() + (gx * 40);
+                    destinationX = automaton.getX() + (gx  * Utils.DISTANCE_MULTIPLIER);
                 } while (destinationX > xBoundary || destinationX < 0 || gx > 1 || gx < -1);
 
                 double gy;
                 do {
                     gy = Utils.R.nextGaussian();
-                    destinationY = automaton.getY() + (gy * 40);
+                    destinationY = automaton.getY() + (gy * Utils.DISTANCE_MULTIPLIER);
                 } while (destinationY > yBoundary || destinationY < 0 || gy > 1 || gy < -1);
-                automaton.targetLocation = new CartesianPoint<>(destinationX, destinationY);
+                automaton.setTargetLocation(new CartesianPoint<>(destinationX, destinationY));
                 automaton.setDistanceToLocation( CartesianPoint.distance(automaton.getTargetLocation(), automaton.getPosition()));
                 automaton.updateVelocity((destinationX - automaton.getX()) * Utils.AUTOMATON_SPEED_NORMAL,
                                          (destinationY - automaton.getY()) * Utils.AUTOMATON_SPEED_NORMAL);
-                automaton.setState(AutomotonState.EXPLORATION_GOTO_DESTINATION);
+                automaton.setState(AutomotonState.GOTO_DESTINATION);
                 automaton.checkforResource();
             }
         },
-        EXPLORATION_GOTO_DESTINATION {
+        GOTO_DESTINATION {
             @Override
             public void update(final Automaton automaton) {
                 automaton.updatePosition(automaton.position.getX() + (automaton.getDeltaX() / automaton.getDistanceToDestination()),
                                          automaton.position.getY() + (automaton.getDeltaY() / automaton.getDistanceToDestination()));
                 if(CartesianPoint.distance(automaton.getTargetLocation(), automaton.getPosition()) < 1) {
-                    automaton.setState(AutomotonState.EXPLORATION_CHOOSE_DESTINATION);
+                    automaton.setState(AutomotonState.CHOOSE_DESTINATION);
                 }
-                //automaton.checkforResource();
             }
         },
         DEAD {
